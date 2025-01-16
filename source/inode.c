@@ -12,6 +12,7 @@ struct inode* vtfs_get_inode(
   }
 
   inode->i_op = &vtfs_inode_ops;
+  inode->i_fop = &vtfs_file_ops;
   inode->i_ino = i_ino;
   return inode;
 }
