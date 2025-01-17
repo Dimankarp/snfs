@@ -15,15 +15,18 @@ struct dentry* vtfs_lookup(
 ) {
   ino_t root = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
-  if (root == 1000 && !strcmp(name, "test.txt") && (mask & 1) != 0) {
+  if (root == 1000 && !strcmp(name, "test.txt") && ((mask & 1) != 0)) {
     struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG, 101);
+    atomic_inc(&inode->i_count);
     d_add(child_dentry, inode);
     return child_dentry;
   } else if (root == 1000 && !strcmp(name, "dir")) {
     struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFDIR, 200);
+    atomic_inc(&inode->i_count);
     d_add(child_dentry, inode);
     return child_dentry;
   }
+  d_add(child_dentry, NULL);
   return NULL;
 }
 
@@ -43,15 +46,7 @@ int vtfs_create(
     pr_alert("Create test.txt mask: %llu", mask);
     mask |= 1;
     pr_alert("End test.txt mask: %llu", mask);
-    d_add(child_dentry, inode);
-
-  } else if (root == 1000 && !strcmp(name, "new_file.txt")) {
-    struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG | S_IRWXUGO, 102);
-    inode->i_op = &vtfs_inode_ops;
-    inode->i_fop = NULL;
-
-    d_add(child_dentry, inode);
-    mask |= 2;
+    d_instantiate(child_dentry, inode);
   }
   return 0;
 }
