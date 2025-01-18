@@ -60,6 +60,32 @@ int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from) {
   return 0;
 }
 
+int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from) {
+  if (!S_ISDIR(dir->inode->type)) {
+    return -ENOTDIR;
+  }
+  struct vtfs_inode* vtfsi = dir->inode;
+  spin_lock(&vtfsi->lock);
+  if (!list_empty(&vtfsi->children)) {
+    spin_unlock(&vtfsi->lock);
+    return -ENOTEMPTY;
+  }
+  spin_unlock(&vtfsi->lock);
+
+  vtfsi->refs--;
+  if (vtfsi == 0) {
+    spin_lock(&sb.lock);
+    list_del(&vtfsi->node);
+    spin_unlock(&sb.lock);
+    kfree(vtfsi);
+  }
+  spin_lock(&from->lock);
+  list_del(&dir->node);
+  spin_unlock(&from->lock);
+  kfree(dir);
+  return 0;
+}
+
 struct vtfs_inode* vtfs_inode_by_ino(ino_t ino) {
   struct vtfs_inode* inode;
   spin_lock(&sb.lock);

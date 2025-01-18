@@ -5,7 +5,11 @@
 #include "util.h"
 
 const struct inode_operations vtfs_inode_ops = {
-    .lookup = vtfs_lookup, .create = vtfs_create,  .unlink = vtfs_unlink
+    .lookup = vtfs_lookup,
+    .create = vtfs_create,
+    .unlink = vtfs_unlink,
+    .mkdir = vtfs_mkdir,
+    .rmdir = vtfs_rmdir
 };
 
 const struct file_operations vtfs_file_ops = {.iterate_shared = vtfs_iterate};
@@ -32,20 +36,13 @@ struct dentry* vtfs_lookup(
   return NULL;
 }
 
-int vtfs_create(
-    struct mnt_idmap* map,
-    struct inode* parent_inode,
-    struct dentry* child_dentry,
-    umode_t mode,
-    bool b
-) {
+static int vtfs_create_dentry(struct inode* parent_inode, struct dentry* child_dentry, int ftype) {
   ino_t dirino = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
 
   if (strlen(name) > VTFS_NAME_SZ) {
     return -ENOANO;
   }
-  LOG("[vtfs_create]");
   LOG("Searching for inode %lu\n", dirino);
   struct vtfs_inode* diri = vtfs_inode_by_ino(dirino);
   if (diri == NULL) {
@@ -58,7 +55,7 @@ int vtfs_create(
     return -ENOMEM;
   }
   LOG("Allocated entry %s\n", vtfsentry->name);
-  int status = vtfs_create_file(vtfsentry, S_IFREG);
+  int status = vtfs_create_file(vtfsentry, ftype);
   if (status < 0) {
     kfree(vtfsentry);
     return status;
@@ -66,10 +63,28 @@ int vtfs_create(
   LOG("Created file with entry %s\n", vtfsentry->name);
   vtfs_add_child(diri, vtfsentry);
   LOG("Added entry %s as child\n", vtfsentry->name);
-  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG, vtfsentry->inode->no);
+  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, ftype, vtfsentry->inode->no);
   d_instantiate(child_dentry, inode);
   LOG("Added inode to childentry \n");
   return 0;
+}
+
+int vtfs_create(
+    struct mnt_idmap* map,
+    struct inode* parent_inode,
+    struct dentry* child_dentry,
+    umode_t mode,
+    bool b
+) {
+  LOG("[vtfs_create]");
+  return vtfs_create_dentry(parent_inode, child_dentry, S_IFREG);
+}
+
+int vtfs_mkdir(
+    struct mnt_idmap* map, struct inode* parent_inode, struct dentry* child_dentry, umode_t mode
+) {
+  LOG("[vtfs_mkdir]");
+  return vtfs_create_dentry(parent_inode, child_dentry, S_IFDIR);
 }
 
 int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
@@ -88,6 +103,24 @@ int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
     return -ENODATA;
   }
   return vtfs_remove_file(vtfsd, diri);
+}
+
+int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry) {
+  const char* name = child_dentry->d_name.name;
+  ino_t dirino = parent_inode->i_ino;
+  LOG("[vtfs_rmdir]");
+  LOG("Searching for inode %lu\n", dirino);
+  struct vtfs_inode* diri = vtfs_inode_by_ino(dirino);
+  if (diri == NULL) {
+    return -ENODATA;
+  }
+  LOG("Found inode %lu\n", dirino);
+  LOG("Searching %s \n", name);
+  struct vtfs_dentry* vtfsd = vtfs_find_child(diri, name);
+  if (vtfsd == NULL) {
+    return -ENODATA;
+  }
+  return vtfs_remove_dir(vtfsd, diri);
 }
 
 int vtfs_iterate(struct file* filp, struct dir_context* ctx) {

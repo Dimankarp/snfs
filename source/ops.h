@@ -20,4 +20,8 @@ int vtfs_create(
     bool b
 );
 int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry);
+int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry);
+int vtfs_mkdir(
+    struct mnt_idmap* map, struct inode* parent_inode, struct dentry* child_dentry, umode_t mode
+);
 #endif  // __FSMOD_SOURCE_OPS_H_
