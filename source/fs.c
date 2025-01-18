@@ -3,21 +3,19 @@
 
 #include <linux/dcache.h>
 
+#include "impl.h"
 #include "inode.h"
-
-struct file_system_type vtfs_fs_type = {
-    .name = "vtfs",
-    .mount = vtfs_mount,
-    .kill_sb = vtfs_kill_sb,
-};
 
 void vtfs_kill_sb(struct super_block* sb) {
   printk(KERN_INFO "vtfs super block is destroyed. Unmount successfully.\n");
 }
 
 int vtfs_fill_super(struct super_block* sb, void* data, int silent) {
-  struct inode* inode = vtfs_get_inode(sb, NULL, S_IFDIR, 1000);
-
+  int status = vtfs_init_sb();
+  if (status < 0) {
+    return status;
+  }
+  struct inode* inode = vtfs_get_inode(sb, NULL, S_IFDIR, VTFS_ROOT_NO);
   sb->s_root = d_make_root(inode);
   if (sb->s_root == NULL) {
     return -ENOMEM;

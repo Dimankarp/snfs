@@ -1,11 +1,10 @@
 #include "ops.h"
 
+#include "impl.h"
 #include "inode.h"
 
-static unsigned long long mask = 0;
-
 const struct inode_operations vtfs_inode_ops = {
-    .lookup = vtfs_lookup, .create = vtfs_create, .unlink = vtfs_unlink
+    .lookup = vtfs_lookup, .create = vtfs_create,// .unlink = vtfs_unlink
 };
 
 const struct file_operations vtfs_file_ops = {.iterate_shared = vtfs_iterate};
@@ -13,20 +12,22 @@ const struct file_operations vtfs_file_ops = {.iterate_shared = vtfs_iterate};
 struct dentry* vtfs_lookup(
     struct inode* parent_inode, struct dentry* child_dentry, unsigned int flag
 ) {
-  ino_t root = parent_inode->i_ino;
+  ino_t dirno = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
-  if (root == 1000 && !strcmp(name, "test.txt") && ((mask & 1) != 0)) {
-    struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG, 101);
-    atomic_inc(&inode->i_count);
-    d_add(child_dentry, inode);
-    return child_dentry;
-  } else if (root == 1000 && !strcmp(name, "dir")) {
-    struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFDIR, 200);
-    atomic_inc(&inode->i_count);
-    d_add(child_dentry, inode);
-    return child_dentry;
+  struct vtfs_inode* vtfsi = vtfs_inode_by_ino(dirno);
+  if (vtfsi == NULL) {
+    d_add(child_dentry, NULL);
+    return ERR_PTR(-ENODATA);
   }
-  d_add(child_dentry, NULL);
+  struct vtfs_dentry* vtfsd = vtfs_find_child(vtfsi, name);
+  if (vtfsi == NULL) {
+    d_add(child_dentry, NULL);
+    return ERR_PTR(-ENODATA);
+  }
+  struct vtfs_inode* found = vtfsd->inode;
+  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, found->type, found->no);
+  atomic_inc(&inode->i_count);
+  d_add(child_dentry, inode);
   return NULL;
 }
 
@@ -37,68 +38,71 @@ int vtfs_create(
     umode_t mode,
     bool b
 ) {
-  ino_t root = parent_inode->i_ino;
+  ino_t dirino = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
-  if (root == 1000 && !strcmp(name, "test.txt")) {
-    struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG | S_IRWXUGO, 101);
-    inode->i_op = &vtfs_inode_ops;
-    inode->i_fop = NULL;
-    pr_alert("Create test.txt mask: %llu", mask);
-    mask |= 1;
-    pr_alert("End test.txt mask: %llu", mask);
-    d_instantiate(child_dentry, inode);
+
+  if (strlen(name) > VTFS_NAME_SZ) {
+    return -ENOANO;
   }
+
+  struct vtfs_inode* diri = vtfs_inode_by_ino(dirino);
+  if (diri == NULL) {
+    return -ENODATA;
+  }
+  struct vtfs_dentry* vtfsentry = kzalloc(sizeof(*vtfsentry), GFP_KERNEL);
+  strcpy(vtfsentry->name, name);
+  if (vtfsentry == NULL) {
+    return -ENOMEM;
+  }
+  int status = vtfs_create_file(vtfsentry, S_IFREG);
+  if (status < 0) {
+    kfree(vtfsentry);
+    return status;
+  }
+  vtfs_add_child(diri, vtfsentry);
+  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, S_IFREG, vtfsentry->inode->no);
+  inode->i_op = &vtfs_inode_ops;
+  inode->i_fop = NULL;
+  d_instantiate(child_dentry, inode);
   return 0;
 }
 
-int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
-  const char* name = child_dentry->d_name.name;
-  ino_t root = parent_inode->i_ino;
-  if (root == 1000 && !strcmp(name, "test.txt")) {
-    mask &= ~1;
-  } else if (root == 1000 && !strcmp(name, "new_file.txt")) {
-    mask &= ~2;
-  }
-  return 0;
-}
+// int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
+//   const char* name = child_dentry->d_name.name;
+//   ino_t root = parent_inode->i_ino;
+//   if (root == 1000 && !strcmp(name, "test.txt")) {
+//     mask &= ~1;
+//   } else if (root == 1000 && !strcmp(name, "new_file.txt")) {
+//     mask &= ~2;
+//   }
+//   return 0;
+// }
 
 int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
-  char fsname[10];
   struct dentry* dentry = filp->f_path.dentry;
   struct inode* inode = dentry->d_inode;
-  unsigned long offset = filp->f_pos;
-  int stored = 0;
+  int cur = 0;
   ino_t ino = inode->i_ino;
 
-  unsigned char ftype;
-  ino_t dino;
-  pr_alert("Pos: %lld Mask: %llu", ctx->pos, mask);
-  while (ctx->pos < 3) {
-    if (ino == 1000) {
-      if (ctx->pos == 0) {
-        strcpy(fsname, ".");
-        ftype = DT_DIR;
-        dino = ino;
-
-      } else if (ctx->pos == 1) {
-        strcpy(fsname, "..");
-        ftype = DT_DIR;
-        dino = dentry->d_parent->d_inode->i_ino;
-      } else if (ctx->pos == 2 && (mask & 1) != 0) {
-        strcpy(fsname, "test.txt");
-        ftype = DT_REG;
-        dino = 101;
-      } else if (ctx->pos == 3 && (mask & 2) != 0) {
-        strcpy(fsname, "new_file.txt");
-        ftype = DT_REG;
-        dino = 102;
-      } else {
-        return stored;
-      }
-      stored++;
-      ctx->pos++;
-      dir_emit(ctx, fsname, 10, dino, ftype);
-    }
+  struct vtfs_inode* diri = vtfs_inode_by_ino(ino);
+  if (diri == NULL) {
+    return -ENODATA;
   }
-  return stored;
+
+  if (!S_ISDIR(inode->i_mode)) {
+    return -ENOTDIR;
+  }
+
+  if (!dir_emit_dots(filp, ctx)) {
+    return 0;
+  }
+  struct vtfs_dentry* vtfsd;
+  list_for_each_entry(vtfsd, &diri->children, node) {
+    if (cur == ctx->pos) {
+      ctx->pos++;
+      dir_emit(ctx, vtfsd->name, VTFS_NAME_SZ, vtfsd->inode->no, vtfsd->inode->type);
+    }
+    cur++;
+  }
+  return 0;
 }

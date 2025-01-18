@@ -12,6 +12,12 @@ MODULE_DESCRIPTION("A simple FS kernel module");
 
 #define LOG(fmt, ...) pr_info("[" MODULE_NAME "]: " fmt, ##__VA_ARGS__)
 
+static struct file_system_type vtfs_fs_type = {
+    .name = MODULE_NAME,
+    .mount = vtfs_mount,
+    .kill_sb = vtfs_kill_sb,
+};
+
 static int __init vtfs_init(void) {
   LOG("VTFS joined the kernel\n");
 

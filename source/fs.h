@@ -4,8 +4,6 @@
 #include <linux/fs.h>
 #include <linux/kobject.h>
 
-extern struct file_system_type vtfs_fs_type;
-
 void vtfs_kill_sb(struct super_block* sb);
 
 int vtfs_fill_super(struct super_block* sb, void* data, int silent);
