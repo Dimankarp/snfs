@@ -3,14 +3,11 @@
 #include <linux/printk.h>
 
 #include "fs.h"
-
-#define MODULE_NAME "vtfs"
+#include "util.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("mitya-ha-ha");
 MODULE_DESCRIPTION("A simple FS kernel module");
-
-#define LOG(fmt, ...) pr_info("[" MODULE_NAME "]: " fmt, ##__VA_ARGS__)
 
 static struct file_system_type vtfs_fs_type = {
     .name = MODULE_NAME,

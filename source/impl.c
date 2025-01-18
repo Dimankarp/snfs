@@ -17,7 +17,9 @@ int vtfs_init_sb(void) {
   }
   inode->refs = 1;
   inode->no = VTFS_ROOT_NO;
-  inode->type = S_IFDIR;
+  inode->type = S_IFREG;
+  spin_lock_init(&inode->lock);
+  INIT_LIST_HEAD(&inode->children);
   list_add(&inode->node, &sb.inodes);
   return 0;
 }
@@ -67,6 +69,6 @@ struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name) 
 
 void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry) {
   spin_lock(&dir->lock);
-  list_add(&dir->children, &entry->node);
+  list_add(&entry->node, &dir->children);
   spin_unlock(&dir->lock);
 }
