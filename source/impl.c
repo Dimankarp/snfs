@@ -41,6 +41,25 @@ int vtfs_create_file(struct vtfs_dentry* dentry, int type) {
   return 0;
 }
 
+int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from) {
+  if (S_ISDIR(file->inode->type)) {
+    return -EISDIR;
+  }
+  struct vtfs_inode* vtfsi = file->inode;
+  vtfsi->refs--;
+  if (vtfsi == 0) {
+    spin_lock(&sb.lock);
+    list_del(&vtfsi->node);
+    spin_unlock(&sb.lock);
+    kfree(vtfsi);
+  }
+  spin_lock(&from->lock);
+  list_del(&file->node);
+  spin_unlock(&from->lock);
+  kfree(file);
+  return 0;
+}
+
 struct vtfs_inode* vtfs_inode_by_ino(ino_t ino) {
   struct vtfs_inode* inode;
   spin_lock(&sb.lock);

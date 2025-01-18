@@ -5,7 +5,7 @@
 #include "util.h"
 
 const struct inode_operations vtfs_inode_ops = {
-    .lookup = vtfs_lookup, .create = vtfs_create,  // .unlink = vtfs_unlink
+    .lookup = vtfs_lookup, .create = vtfs_create,  .unlink = vtfs_unlink
 };
 
 const struct file_operations vtfs_file_ops = {.iterate_shared = vtfs_iterate};
@@ -72,16 +72,23 @@ int vtfs_create(
   return 0;
 }
 
-// int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
-//   const char* name = child_dentry->d_name.name;
-//   ino_t root = parent_inode->i_ino;
-//   if (root == 1000 && !strcmp(name, "test.txt")) {
-//     mask &= ~1;
-//   } else if (root == 1000 && !strcmp(name, "new_file.txt")) {
-//     mask &= ~2;
-//   }
-//   return 0;
-// }
+int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
+  const char* name = child_dentry->d_name.name;
+  ino_t dirino = parent_inode->i_ino;
+  LOG("[vtfs_unlink]");
+  LOG("Searching for inode %lu\n", dirino);
+  struct vtfs_inode* diri = vtfs_inode_by_ino(dirino);
+  if (diri == NULL) {
+    return -ENODATA;
+  }
+  LOG("Found inode %lu\n", dirino);
+  LOG("Searching %s \n", name);
+  struct vtfs_dentry* vtfsd = vtfs_find_child(diri, name);
+  if (vtfsd == NULL) {
+    return -ENODATA;
+  }
+  return vtfs_remove_file(vtfsd, diri);
+}
 
 int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
   struct dentry* dentry = filp->f_path.dentry;

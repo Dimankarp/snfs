@@ -34,4 +34,5 @@ int vtfs_create_file(struct vtfs_dentry* dentry, int type);
 struct vtfs_inode* vtfs_inode_by_ino(ino_t ino);
 struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name);
 void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry);
+int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from);
 #endif  // __FSMOD_SOURCE_IMPL_H_s

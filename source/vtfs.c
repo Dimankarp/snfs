@@ -17,7 +17,6 @@ static struct file_system_type vtfs_fs_type = {
 
 static int __init vtfs_init(void) {
   LOG("VTFS joined the kernel\n");
-
   register_filesystem(&vtfs_fs_type);
   LOG("Registered fs\n");
   return 0;
