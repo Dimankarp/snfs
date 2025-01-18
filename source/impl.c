@@ -2,6 +2,8 @@
 
 #include <linux/slab.h>
 
+#include "util.h"
+
 static struct vtfs_superblock sb;
 
 int vtfs_init_sb(void) {
@@ -17,10 +19,11 @@ int vtfs_init_sb(void) {
   }
   inode->refs = 1;
   inode->no = VTFS_ROOT_NO;
-  inode->type = S_IFREG;
+  inode->type = S_IFDIR;
   spin_lock_init(&inode->lock);
   INIT_LIST_HEAD(&inode->children);
   list_add(&inode->node, &sb.inodes);
+  sb.root = inode;
   return 0;
 }
 
@@ -116,4 +119,36 @@ void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry) {
   spin_lock(&dir->lock);
   list_add(&entry->node, &dir->children);
   spin_unlock(&dir->lock);
+}
+
+int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz) {
+  if (S_ISDIR(file->type)) {
+    return -EISDIR;
+  }
+  char* new_buf = kzalloc(newsz, GFP_KERNEL);  // GFP_KERNEL isn't the right choice here probably
+  if (new_buf == NULL) {
+    return -ENOMEM;
+  }
+
+  if (file->buf != NULL) {
+    memcpy(new_buf, file->buf, min(newsz, file->bufsz));
+  }
+  kfree(file->buf);
+  file->buf = new_buf;
+  file->bufsz = newsz;
+  return 0;
+}
+
+static void vtfs_dump_recursion(struct vtfs_inode* f) {
+  struct vtfs_dentry* dentry;
+  list_for_each_entry(dentry, &f->children, node) {
+    LOG("Inode %d name: %s isdir %d", dentry->inode->no, dentry->name, S_ISDIR(dentry->inode->type)
+    );
+    if (dentry->inode->type == S_IFDIR)
+      vtfs_dump_recursion(dentry->inode);
+  }
+}
+
+void vtfs_dump(void) {
+  vtfs_dump_recursion(sb.root);
 }

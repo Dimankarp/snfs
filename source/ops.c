@@ -12,7 +12,9 @@ const struct inode_operations vtfs_inode_ops = {
     .rmdir = vtfs_rmdir
 };
 
-const struct file_operations vtfs_file_ops = {.iterate_shared = vtfs_iterate};
+const struct file_operations vtfs_file_ops = {
+    .iterate_shared = vtfs_iterate, .write = vtfs_write, .read = vtfs_read
+};
 
 struct dentry* vtfs_lookup(
     struct inode* parent_inode, struct dentry* child_dentry, unsigned int flag
@@ -124,6 +126,8 @@ int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry) {
 }
 
 int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
+  vtfs_dump();
+
   struct dentry* dentry = filp->f_path.dentry;
   struct inode* inode = dentry->d_inode;
   ino_t dirino = inode->i_ino;
@@ -158,4 +162,57 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
   }
   spin_unlock(&diri->lock);
   return 0;
+}
+
+ssize_t vtfs_read(struct file* filp, char __user* buffer, size_t len, loff_t* offset) {
+  ino_t fino = filp->f_inode->i_ino;
+  LOG("[vtfs_read]");
+  LOG("Searching for inode %lu\n", fino);
+  struct vtfs_inode* filei = vtfs_inode_by_ino(fino);
+  if (filei == NULL) {
+    return -ENODATA;
+  }
+  LOG("It's not null type is %d", filei->type);
+  if (filei->type == S_IFDIR) {
+    return -EISDIR;
+  }
+
+  spin_lock(&filei->lock);
+  LOG("Contents are %.*s", filei->bufsz, filei->buf);
+  LOG("Read is for len %zu offset %lld\n", len, *offset);
+  if (filei->buf == NULL || *offset >= filei->bufsz) {
+    spin_unlock(&filei->lock);
+    return 0;
+  }
+
+  size_t toread = min(filei->bufsz - *offset, len);
+  if (copy_to_user(buffer, filei->buf + *offset, toread)) {
+    spin_unlock(&filei->lock);
+    return -EFAULT;
+  }
+  *offset += toread;
+  spin_unlock(&filei->lock);
+  return toread;
+}
+
+ssize_t vtfs_write(struct file* filp, const char __user* buffer, size_t len, loff_t* offset) {
+  ino_t dirino = filp->f_inode->i_ino;
+  LOG("[vtfs_write]");
+  LOG("Searching for inode %lu\n", dirino);
+  struct vtfs_inode* filei = vtfs_inode_by_ino(dirino);
+  if (filei == NULL) {
+    return -ENODATA;
+  }
+  LOG("Checking for dir %lu\n", dirino);
+  if (S_ISDIR(filei->type))
+    return -EISDIR;
+  LOG("Not dir %lu\n", dirino);
+  spin_lock(&filei->lock);
+
+  size_t newsz = *offset + len;
+  vtfs_set_buf_sz(filei, newsz);
+  copy_from_user(filei->buf + *offset, buffer, len);
+  spin_unlock(&filei->lock);
+  *offset += len;
+  return len;
 }

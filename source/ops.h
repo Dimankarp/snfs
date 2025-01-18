@@ -24,4 +24,8 @@ int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry);
 int vtfs_mkdir(
     struct mnt_idmap* map, struct inode* parent_inode, struct dentry* child_dentry, umode_t mode
 );
+ssize_t vtfs_read(struct file* filp, char* __user buffer, size_t len, loff_t* offset);
+
+ssize_t vtfs_write(struct file* filp, const char* __user buffer, size_t len, loff_t* offset);
+
 #endif  // __FSMOD_SOURCE_OPS_H_

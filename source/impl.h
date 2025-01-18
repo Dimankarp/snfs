@@ -13,6 +13,8 @@ struct vtfs_inode {
   ino_t no;
   int type;
   struct list_head children; /* list of vtfs_dentry */
+  char* buf;
+  size_t bufsz;
   spinlock_t lock;
 };
 
@@ -25,6 +27,7 @@ struct vtfs_dentry {
 struct vtfs_superblock {
   struct list_head inodes;
   struct list_head dentries;
+  struct vtfs_inode* root;
   spinlock_t lock;
   _Atomic ino_t next_ino;
 };
@@ -36,4 +39,6 @@ struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name);
 void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry);
 int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from);
 int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from);
+int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz);
+void vtfs_dump(void);
 #endif  // __FSMOD_SOURCE_IMPL_H_s
