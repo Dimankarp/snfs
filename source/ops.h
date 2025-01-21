@@ -27,5 +27,5 @@ int vtfs_mkdir(
 ssize_t vtfs_read(struct file* filp, char* __user buffer, size_t len, loff_t* offset);
 
 ssize_t vtfs_write(struct file* filp, const char* __user buffer, size_t len, loff_t* offset);
-
+int vtfs_fsync (struct file*, loff_t, loff_t, int);
 #endif  // __FSMOD_SOURCE_OPS_H_

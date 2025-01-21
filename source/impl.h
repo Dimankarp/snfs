@@ -15,7 +15,7 @@ struct vtfs_inode {
   struct list_head children; /* list of vtfs_dentry */
   char* buf;
   size_t bufsz;
-  spinlock_t lock;
+  struct mutex lock;
 };
 
 struct vtfs_dentry {

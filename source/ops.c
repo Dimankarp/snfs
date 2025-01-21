@@ -13,7 +13,7 @@ const struct inode_operations vtfs_inode_ops = {
 };
 
 const struct file_operations vtfs_file_ops = {
-    .iterate_shared = vtfs_iterate, .write = vtfs_write, .read = vtfs_read
+    .iterate_shared = vtfs_iterate, .write = vtfs_write, .read = vtfs_read, .fsync = vtfs_fsync
 };
 
 struct dentry* vtfs_lookup(
@@ -150,7 +150,7 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
   cur = 2;
   LOG("Emitted node");
   struct vtfs_dentry* vtfsd;
-  spin_lock(&diri->lock);
+  mutex_lock(&diri->lock);
   list_for_each_entry(vtfsd, &diri->children, node) {
     LOG("Cur: %d Pos: %lld", cur, ctx->pos);
     if (cur == ctx->pos) {
@@ -160,11 +160,11 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
     }
     cur++;
   }
-  spin_unlock(&diri->lock);
+  mutex_unlock(&diri->lock);
   return 0;
 }
 
-ssize_t vtfs_read(struct file* filp, char __user* buffer, size_t len, loff_t* offset) {
+ssize_t vtfs_read(struct file* filp, char* buffer, size_t len, loff_t* offset) {
   ino_t fino = filp->f_inode->i_ino;
   LOG("[vtfs_read]");
   LOG("Searching for inode %lu\n", fino);
@@ -177,25 +177,42 @@ ssize_t vtfs_read(struct file* filp, char __user* buffer, size_t len, loff_t* of
     return -EISDIR;
   }
 
-  spin_lock(&filei->lock);
-  LOG("Contents are %.*s", filei->bufsz, filei->buf);
-  LOG("Read is for len %zu offset %lld\n", len, *offset);
-  if (filei->buf == NULL || *offset >= filei->bufsz) {
-    spin_unlock(&filei->lock);
-    return 0;
+  if (offset == NULL) {
+    return -1;
   }
-
+  mutex_lock(&filei->lock);
   size_t toread = min(filei->bufsz - *offset, len);
-  if (copy_to_user(buffer, filei->buf + *offset, toread)) {
-    spin_unlock(&filei->lock);
+  if (copy_to_user((void __user*)buffer, filei->buf + *offset, toread)) {
+    mutex_unlock(&filei->lock);
     return -EFAULT;
   }
   *offset += toread;
-  spin_unlock(&filei->lock);
+  mutex_unlock(&filei->lock);
   return toread;
+
+  // spin_lock(&filei->lock);
+  // LOG("Contents are %.*s", filei->bufsz, filei->buf);
+  // LOG("Read is for len %zu offset %lld\n", len, *offset);
+  // if (filei->buf == NULL || *offset >= filei->bufsz) {
+  //   spin_unlock(&filei->lock);
+  //   return 0;
+  // }
+
+  // size_t toread = min(filei->bufsz - *offset, len);
+  // int check = access_ok(buffer, 10);
+  // LOG("Acces ok check %d ", check);
+  // LOG("Reading %d to %px and bufsz is %d\n", toread, buffer, filei->bufsz);
+  // char* buf = "THIS IS A BIG BUFFER! I HOPE IT DOESNT FAIL";
+  // if (copy_to_user((void __user*)buffer, buf, 1)) {
+  //   spin_unlock(&filei->lock);
+  //   return -EFAULT;
+  // }
+  // *offset += toread;
+  // spin_unlock(&filei->lock);
+  // return toread;
 }
 
-ssize_t vtfs_write(struct file* filp, const char __user* buffer, size_t len, loff_t* offset) {
+ssize_t vtfs_write(struct file* filp, const char* buffer, size_t len, loff_t* offset) {
   ino_t dirino = filp->f_inode->i_ino;
   LOG("[vtfs_write]");
   LOG("Searching for inode %lu\n", dirino);
@@ -207,12 +224,20 @@ ssize_t vtfs_write(struct file* filp, const char __user* buffer, size_t len, lof
   if (S_ISDIR(filei->type))
     return -EISDIR;
   LOG("Not dir %lu\n", dirino);
-  spin_lock(&filei->lock);
+  mutex_lock(&filei->lock);
 
   size_t newsz = *offset + len;
   vtfs_set_buf_sz(filei, newsz);
-  copy_from_user(filei->buf + *offset, buffer, len);
-  spin_unlock(&filei->lock);
+  int status = copy_from_user(filei->buf + *offset, buffer, len);
+  LOG("Copied from user offset: %d len %d status %d\n", *offset, len, status);
+  mutex_unlock(&filei->lock);
+  filp->f_inode->i_size = newsz;
+  filp->f_inode->i_blkbits = 8;
+  filp->f_inode->i_blocks = newsz;
   *offset += len;
   return len;
+}
+
+int vtfs_fsync(struct file* file, loff_t start, loff_t end, int datasync) {
+  return 0;
 }
