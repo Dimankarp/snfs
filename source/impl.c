@@ -44,6 +44,15 @@ int vtfs_create_file(struct vtfs_dentry* dentry, int type) {
   return 0;
 }
 
+int vtfs_hard_link(struct vtfs_inode* inode, struct vtfs_dentry* new) {
+  if (S_ISDIR(inode->type)) {
+    return -EISDIR;
+  }
+  inode->refs++;
+  new->inode = inode;
+  return 0;
+}
+
 int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from) {
   if (S_ISDIR(file->inode->type)) {
     return -EISDIR;
