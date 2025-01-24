@@ -1,0 +1,14 @@
+services:
+  postgres:
+    build:
+      context: postgres/
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=studs
+      - POSTGRES_USER=linux
+      - POSTGRES_PASSWORD=hatelinus
+    networks:
+      - postgres
+networks:
+  postgres:

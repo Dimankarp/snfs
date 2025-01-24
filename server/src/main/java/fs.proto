@@ -1,0 +1,59 @@
+syntax = "proto2";
+
+package protocol;
+
+option java_multiple_files = true;
+option java_package = "snfs.fserver.protocol";
+option java_outer_classname = "FsProto";
+
+
+message MsgDto{
+  required ErrStatus status = 1;
+}
+
+message InodeMsgDto{
+  required ErrStatus status = 1;
+  optional InodeDto inode = 2;
+}
+
+message ChildrenMsgDto{
+  required ErrStatus status = 1;
+  repeated DentryDto children = 2;
+}
+
+message TextMsgDto {
+  required ErrStatus status = 1;
+  optional string text = 2;
+}
+
+enum InodeType {
+  REG = 1;
+  DIR = 2;
+}
+
+enum ErrStatus {
+  OK = 1;
+  MISSING = 2;
+  NOTDIR = 3;
+  ISDIR = 4;
+  EMPTY = 5;
+  UNKNOWN = 6;
+  DUPLICATE = 7;
+}
+
+message DentryDto {
+  required string name = 1;
+  required InodeDto inode = 2;
+}
+
+message InodeDto {
+  required int32 no = 1;
+  required InodeType type = 2;
+  required int32 size = 4;
+}
+
+message InodeChildren {
+  repeated DentryDto children = 1;
+}
+
+
