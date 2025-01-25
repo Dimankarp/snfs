@@ -9,6 +9,12 @@ import org.springframework.web.bind.annotation.RestController;
 import snfs.fserver.protocol.InodeType;
 import snfs.fserver.service.FileService;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 @RestController("/api")
 public class FileResource {
 
@@ -21,10 +27,15 @@ public class FileResource {
 
     /* Returns InodeMsg with root */
     @GetMapping("/mount")
-    public ResponseEntity<byte[]> mount(@RequestParam String token) {
-        var res = fileService.mount(token);
-        logger.info("Mounted file: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+    public ResponseEntity<byte[]> mount(@RequestParam String token) throws IOException {
+        ByteBuffer  bs = ByteBuffer.allocate(4096).order(ByteOrder.LITTLE_ENDIAN).putLong(16).putInt(-10);
+        byte[] buf = new byte[bs.position()];
+        bs.rewind();
+        var res = bs.get(buf);
+                //fileService.mount(token);
+        logger.info("Mounted file: {}", buf);
+
+        return ResponseEntity.ok(buf);
     }
 
     /* Returns InodeMsg with entry */
