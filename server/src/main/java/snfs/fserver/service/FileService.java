@@ -147,6 +147,25 @@ public class FileService {
     }
 
     @Transactional
+    public ResponseBuilder lookup(String tk, Long dir, String name) {
+        var dirOpt = inodeRepository.findById(dir);
+        var builder = new ResponseBuilder();
+        if (dirOpt.isEmpty()) {
+            return builder.addItem(msgDto(ErrStatus.MISSING));
+        }
+        var dirNode = dirOpt.get();
+        if (dirNode.getType() != InodeType.DIR) {
+            return builder.addItem(msgDto(ErrStatus.NOTDIR));
+        }
+        for (var child : dirNode.getFiles()) {
+            if (child.getName().equals(name)) {
+                return builder.addItem(msgDto(ErrStatus.OK)).addItem(inodeToDto(child.getInode()));
+            }
+        }
+        return builder.addItem(msgDto(ErrStatus.MISSING));
+    }
+
+    @Transactional
     public ResponseBuilder read(String tk, Long ino, Long offset) {
         var fileOpt = inodeRepository.findById(ino);
         var builder = new ResponseBuilder();

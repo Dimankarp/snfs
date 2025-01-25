@@ -23,7 +23,7 @@ public class FileResource {
 
     /* Returns InodeMsg with root */
     @GetMapping("/mount")
-    public ResponseEntity<byte[]> mount(@RequestParam String token) throws IOException {
+    public ResponseEntity<byte[]> mount(@RequestParam String token) {
         var res = fileService.mount(token);
         return ResponseEntity.ok(res.toSizedByteArray());
     }
@@ -33,6 +33,14 @@ public class FileResource {
     public ResponseEntity<byte[]> create(@RequestParam String token, @RequestParam Long dir,
                                          @RequestParam String name, @RequestParam InodeType type) {
         var res = fileService.create(token, dir, name, type);
+        return ResponseEntity.ok(res.toSizedByteArray());
+    }
+
+    /* Returns InodeMsg with entry */
+    @GetMapping("/lookup")
+    public ResponseEntity<byte[]> lookup(@RequestParam String token, @RequestParam Long dir,
+                                         @RequestParam String name) {
+        var res = fileService.lookup(token, dir, name);
         return ResponseEntity.ok(res.toSizedByteArray());
     }
 
