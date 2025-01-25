@@ -9,11 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import snfs.fserver.protocol.InodeType;
 import snfs.fserver.service.FileService;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 @RestController("/api")
 public class FileResource {
@@ -28,14 +24,8 @@ public class FileResource {
     /* Returns InodeMsg with root */
     @GetMapping("/mount")
     public ResponseEntity<byte[]> mount(@RequestParam String token) throws IOException {
-        ByteBuffer  bs = ByteBuffer.allocate(4096).order(ByteOrder.LITTLE_ENDIAN).putLong(16).putInt(-10);
-        byte[] buf = new byte[bs.position()];
-        bs.rewind();
-        var res = bs.get(buf);
-                //fileService.mount(token);
-        logger.info("Mounted file: {}", buf);
-
-        return ResponseEntity.ok(buf);
+        var res = fileService.mount(token);
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
     /* Returns InodeMsg with entry */
@@ -43,8 +33,7 @@ public class FileResource {
     public ResponseEntity<byte[]> create(@RequestParam String token, @RequestParam Long dir,
                                          @RequestParam String name, @RequestParam InodeType type) {
         var res = fileService.create(token, dir, name, type);
-        logger.info("CReated file: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
     /* Returns Msg */
@@ -52,16 +41,14 @@ public class FileResource {
     public ResponseEntity<byte[]> remove(@RequestParam String token, @RequestParam Long dir,
                                          @RequestParam String name) {
         var res = fileService.remove(token, dir, name);
-        logger.info("Removed file: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
     /* Returns ChildrenMsg with entries */
     @GetMapping("/children")
     public ResponseEntity<byte[]> children(@RequestParam String token, @RequestParam Long dir) {
         var res = fileService.children(token, dir);
-        logger.info("Got Children file: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
     /* Returns TextMsg */
@@ -69,7 +56,7 @@ public class FileResource {
     public ResponseEntity<byte[]> read(@RequestParam String token, @RequestParam Long ino, @RequestParam Long offset) {
         var res = fileService.read(token, ino, offset);
         logger.info("Read: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
     /* Returns Msg */
@@ -78,7 +65,7 @@ public class FileResource {
                                         @RequestParam String text, @RequestParam Long offset) {
         var res = fileService.write(token, ino, text, offset);
         logger.info("Wrote: {}", res);
-        return ResponseEntity.ok(res.toByteArray());
+        return ResponseEntity.ok(res.toSizedByteArray());
     }
 
 

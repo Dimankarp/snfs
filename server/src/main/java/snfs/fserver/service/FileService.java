@@ -42,43 +42,32 @@ public class FileService {
     }
 
     @Transactional
-    protected ChildrenMsgDto childrenToDto(List<Dentry> dentries) {
-        var children = ChildrenMsgDto.newBuilder();
-        children.setStatus(ErrStatus.OK);
-        children.addAllChildren(dentries.stream().map(this::dentryToDto).toList());
-        return children.build();
+    protected ChildrenDto childrenToDto(List<Dentry> dentries) {
+        var dto = new ChildrenDto();
+        dto.setChildren(dentries.stream().map(this::dentryToDto).toList());
+        return dto;
     }
 
     @Transactional
     protected DentryDto dentryToDto(Dentry dentry) {
-        var builder = DentryDto.newBuilder();
-        builder.setInode(inodeToDto(dentry.getInode()));
-        builder.setName(dentry.getName());
-        return builder.build();
+        var dto = new DentryDto();
+        dto.setName(dentry.getName());
+        dto.setInode(inodeToDto(dentry.getInode()));
+        return dto;
     }
 
-    private InodeMsgDto errorInode(ErrStatus status) {
-        return InodeMsgDto.newBuilder().setStatus(status).build();
-    }
-
-    private ChildrenMsgDto errorChildren(ErrStatus status) {
-        return ChildrenMsgDto.newBuilder().setStatus(status).build();
-    }
-
-    private MsgDto errorMsg(ErrStatus status) {
-        return MsgDto.newBuilder().setStatus(status).build();
-    }
-
-    private TextMsgDto errorText(ErrStatus status) {
-        return TextMsgDto.newBuilder().setStatus(status).build();
+    private MsgDto msgDto(ErrStatus status) {
+        var dto = new MsgDto();
+        dto.setStatus(status);
+        return dto;
     }
 
     private InodeDto inodeToDto(Inode inode) {
-        var builder = InodeDto.newBuilder();
-        builder.setType(inode.getType());
-        builder.setNo(Math.toIntExact(inode.getNo()));
-        builder.setSize(inode.getText() != null ? inode.getText().length() : 0);
-        return builder.build();
+        var dto = new InodeDto();
+        dto.setNo(Math.toIntExact(inode.getNo()));
+        dto.setType(inode.getType());
+        dto.setSize(inode.getText() == null ? 0 : inode.getText().length());
+        return dto;
     }
 
     private Dentry createFile(String name, InodeType type) {
@@ -91,104 +80,111 @@ public class FileService {
     }
 
     @Transactional
-    public InodeMsgDto mount(String token) {
+    public ResponseBuilder mount(String token) {
 
         var tokenOpt = tokenRepository.findByToken(token);
         var tk = tokenOpt.orElseGet(() -> registerToken(token));
-        var indodeDto = inodeToDto(tk.getRoot());
-        return InodeMsgDto.newBuilder().setStatus(ErrStatus.OK).setInode(indodeDto).build();
+        var inodeDto = inodeToDto(tk.getRoot());
+        var builder = new ResponseBuilder();
+        return builder.addItem(msgDto(ErrStatus.OK)).addItem(inodeDto);
     }
 
     @Transactional
-    public InodeMsgDto create(String tk, Long dir, String name, InodeType type) {
+    public ResponseBuilder create(String tk, Long dir, String name, InodeType type) {
         var dirOpt = inodeRepository.findById(dir);
+        var builder = new ResponseBuilder();
         if (dirOpt.isEmpty()) {
-            return errorInode(ErrStatus.MISSING);
+            return builder.addItem(msgDto(ErrStatus.MISSING));
         }
         var dirNode = dirOpt.get();
         if (dirNode.getType() != InodeType.DIR) {
-            return errorInode(ErrStatus.NOTDIR);
+            return builder.addItem(msgDto(ErrStatus.NOTDIR));
         }
         for (var entry : dirNode.getFiles()) {
             if (entry.getName().equals(name)) {
-                return errorInode(ErrStatus.DUPLICATE);
+                return builder.addItem(msgDto(ErrStatus.DUPLICATE));
             }
         }
         var file = createFile(name, type);
         dentryRepository.save(file);
         dirNode.getFiles().add(file);
-        return InodeMsgDto.newBuilder().setStatus(ErrStatus.OK).setInode(inodeToDto(file.getInode())).build();
+        return builder.addItem(msgDto(ErrStatus.OK)).addItem(inodeToDto(file.getInode()));
     }
 
     @Transactional
-    public ChildrenMsgDto children(String tk, Long dir) {
+    public ResponseBuilder children(String tk, Long dir) {
+        var builder = new ResponseBuilder();
         var dirOpt = inodeRepository.findById(dir);
         if (dirOpt.isEmpty()) {
-            return errorChildren(ErrStatus.MISSING);
+            return builder.addItem(msgDto(ErrStatus.MISSING));
         }
         var dirNode = dirOpt.get();
         if (dirNode.getType() != InodeType.DIR) {
-            return errorChildren(ErrStatus.NOTDIR);
+            return builder.addItem(msgDto(ErrStatus.NOTDIR));
         }
-        return childrenToDto(dirNode.getFiles());
+        return builder.addItem(msgDto(ErrStatus.OK)).addItem(childrenToDto(dirNode.getFiles()));
     }
 
     @Transactional
-    public MsgDto remove(String tk, Long dir, String name) {
+    public ResponseBuilder remove(String tk, Long dir, String name) {
         var dirOpt = inodeRepository.findById(dir);
+        var builder = new ResponseBuilder();
         if (dirOpt.isEmpty()) {
-            return errorMsg(ErrStatus.MISSING);
+            return builder.addItem(msgDto(ErrStatus.MISSING));
         }
         var dirNode = dirOpt.get();
         if (dirNode.getType() != InodeType.DIR) {
-            return errorMsg(ErrStatus.NOTDIR);
+            return builder.addItem(msgDto(ErrStatus.NOTDIR));
         }
         for (var child : dirNode.getFiles()) {
             if (child.getName().equals(name)) {
                 dentryRepository.delete(child);
                 dirNode.getFiles().remove(child);
-                return errorMsg(ErrStatus.OK);
+                return builder.addItem(msgDto(ErrStatus.OK));
             }
         }
-        return errorMsg(ErrStatus.MISSING);
+        return builder.addItem(msgDto(ErrStatus.MISSING));
     }
 
     @Transactional
-    public TextMsgDto read(String tk, Long ino, Long offset) {
+    public ResponseBuilder read(String tk, Long ino, Long offset) {
         var fileOpt = inodeRepository.findById(ino);
+        var builder = new ResponseBuilder();
         if (fileOpt.isEmpty()) {
-            return errorText(ErrStatus.MISSING);
+            return builder.addItem(msgDto(ErrStatus.MISSING));
         }
         var fileNode = fileOpt.get();
         if (fileNode.getType() != InodeType.REG) {
-            return errorText(ErrStatus.ISDIR);
+            return builder.addItem(msgDto(ErrStatus.ISDIR));
         }
         var text = fileNode.getText();
         if (text == null || offset >= text.length()) {
-            return errorText(ErrStatus.EMPTY);
+            return builder.addItem(msgDto(ErrStatus.EMPTY));
         }
-        return TextMsgDto.newBuilder().setStatus(ErrStatus.OK).setText(text.substring(Math.toIntExact(offset))).build();
+        var dto = new TextDto();
+        dto.setText(text);
+        return builder.addItem(msgDto(ErrStatus.OK)).addItem(dto);
     }
 
     @Transactional
-    public MsgDto write(String tk, Long ino, String text, Long offset) {
+    public ResponseBuilder write(String tk, Long ino, String text, Long offset) {
         var fileOpt = inodeRepository.findById(ino);
+        var builder = new ResponseBuilder();
         if (fileOpt.isEmpty()) {
-            return errorMsg(ErrStatus.MISSING);
+            return builder.addItem(msgDto(ErrStatus.MISSING));
         }
         var fileNode = fileOpt.get();
         if (fileNode.getType() != InodeType.REG) {
-            return errorMsg(ErrStatus.ISDIR);
+            return builder.addItem(msgDto(ErrStatus.ISDIR));
         }
         var oldText = fileNode.getText();
         var sb = new StringBuilder();
-        if (oldText != null)
-            sb.append(oldText, 0, Math.min(Math.toIntExact(offset), oldText.length()));
+        if (oldText != null) sb.append(oldText, 0, Math.min(Math.toIntExact(offset), oldText.length()));
         var spaces = offset - sb.length();
         sb.append(" ".repeat((int) spaces));
         sb.append(text);
         fileNode.setText(sb.toString());
-        return errorMsg(ErrStatus.OK);
+        return builder.addItem(msgDto(ErrStatus.OK));
     }
 
 }
