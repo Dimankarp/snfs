@@ -1,13 +1,14 @@
 #include "http.h"
 
-const char *SERVER_IP = "0.0.0.0";
+const char* SERVER_IP = "0.0.0.0";
 const int SERVER_PORT = 8080;
 
 // callee should call free_request on received buffer
-int fill_request(struct kvec *vec, const char *token, const char *method,
-                 size_t arg_size, va_list args) {
+int fill_request(
+    struct kvec* vec, const char* token, const char* method, size_t arg_size, va_list args
+) {
   // 2048 bytes for URL and 64 bytes for anything else
-  char *request_buffer = kzalloc(2048 + 64, GFP_KERNEL);
+  char* request_buffer = kzalloc(2048 + 64, GFP_KERNEL);
   if (request_buffer == 0) {
     return -ENOMEM;
   }
@@ -20,9 +21,9 @@ int fill_request(struct kvec *vec, const char *token, const char *method,
 
   for (int i = 0; i < arg_size; i++) {
     strcat(request_buffer, "&");
-    strcat(request_buffer, va_arg(args, char *));
+    strcat(request_buffer, va_arg(args, char*));
     strcat(request_buffer, "=");
-    strcat(request_buffer, va_arg(args, char *));
+    strcat(request_buffer, va_arg(args, char*));
   }
 
   strcat(request_buffer, " HTTP/1.1\r\nHost:");
@@ -36,7 +37,7 @@ int fill_request(struct kvec *vec, const char *token, const char *method,
   return 0;
 }
 
-int receive_all(struct socket *sock, char *buffer, size_t buffer_size) {
+int receive_all(struct socket* sock, char* buffer, size_t buffer_size) {
   struct msghdr hdr;
   struct kvec vec;
 
@@ -59,18 +60,19 @@ int receive_all(struct socket *sock, char *buffer, size_t buffer_size) {
   return read;
 }
 
-int64_t parse_http_response(char *raw_response, size_t raw_response_size,
-                            char *response, size_t response_size) {
-  char *buffer = raw_response;
+int64_t parse_http_response(
+    char* raw_response, size_t raw_response_size, char* response, size_t response_size
+) {
+  char* buffer = raw_response;
 
   // Read Response Line
   {
-    char *status_line = strsep(&buffer, "\r");
+    char* status_line = strsep(&buffer, "\r");
     strsep(&status_line, " ");
     if (status_line == 0) {
       return -6;
     }
-    char *status_code = strsep(&status_line, " ");
+    char* status_code = strsep(&status_line, " ");
     printk(KERN_INFO "Received response with status code %s\n", status_code);
     if (strcmp(status_code, "200") != 0) {
       return -5;
@@ -83,8 +85,8 @@ int64_t parse_http_response(char *raw_response, size_t raw_response_size,
     if (buffer == 0) {
       return -6;
     }
-    char *header = strsep(&buffer, "\r");
-    ++header; // skip \n
+    char* header = strsep(&buffer, "\r");
+    ++header;  // skip \n
     if (strcmp(header, "") == 0) {
       // end of headers
       break;
@@ -98,7 +100,7 @@ int64_t parse_http_response(char *raw_response, size_t raw_response_size,
       printk(KERN_INFO "Received response with content length %d\n", length);
     }
   }
-  ++buffer; // skip last '\n'
+  ++buffer;  // skip last '\n'
 
   if (length == -1) {
     return -6;
@@ -127,10 +129,15 @@ int64_t parse_http_response(char *raw_response, size_t raw_response_size,
   return return_value;
 }
 
-int64_t vtfs_http_call(const char *token, const char *method,
-                            char *response_buffer, size_t buffer_size,
-                            size_t arg_size, ...) {
-  struct socket *sock;
+int64_t vtfs_http_call(
+    const char* token,
+    const char* method,
+    char* response_buffer,
+    size_t buffer_size,
+    size_t arg_size,
+    ...
+) {
+  struct socket* sock;
   int64_t error;
 
   error = sock_create_kern(&init_net, AF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
@@ -138,14 +145,14 @@ int64_t vtfs_http_call(const char *token, const char *method,
     return -1;
   }
 
-  struct sockaddr_in s_addr = {.sin_family = AF_INET,
-                               .sin_addr = {.s_addr = in_aton(SERVER_IP)},
-                               .sin_port = htons(SERVER_PORT)};
+  struct sockaddr_in s_addr = {
+      .sin_family = AF_INET,
+      .sin_addr = {.s_addr = in_aton(SERVER_IP)},
+      .sin_port = htons(SERVER_PORT)
+  };
 
-  error = kernel_connect(sock, (struct sockaddr *)&s_addr,
-                         sizeof(struct sockaddr_in), 0);
+  error = kernel_connect(sock, (struct sockaddr*)&s_addr, sizeof(struct sockaddr_in), 0);
   if (error != 0) {
-
     sock_release(sock);
     return -2;
   }
@@ -174,8 +181,8 @@ int64_t vtfs_http_call(const char *token, const char *method,
     return -3;
   }
 
-  size_t raw_buffer_size = buffer_size + 1024; // add 1KB for HTTP headers
-  char *raw_response_buffer = kmalloc(raw_buffer_size, GFP_KERNEL);
+  size_t raw_buffer_size = buffer_size + 1024;  // add 1KB for HTTP headers
+  char* raw_response_buffer = kmalloc(raw_buffer_size, GFP_KERNEL);
   if (raw_response_buffer == 0) {
     kernel_sock_shutdown(sock, SHUT_RDWR);
     sock_release(sock);
@@ -191,14 +198,13 @@ int64_t vtfs_http_call(const char *token, const char *method,
     return -4;
   }
 
-  error = parse_http_response(raw_response_buffer, read_bytes, response_buffer,
-                              buffer_size);
+  error = parse_http_response(raw_response_buffer, read_bytes, response_buffer, buffer_size);
 
   kfree(raw_response_buffer);
   return error;
 }
 
-void encode(const char *src, char *dst) {
+void encode(const char* src, char* dst) {
   while (*src != '\0') {
     if ((*src >= '0' && *src <= '9') || (*src >= 'a' && *src <= 'z') ||
         (*src >= 'A' && *src <= 'Z')) {

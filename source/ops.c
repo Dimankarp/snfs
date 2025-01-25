@@ -48,7 +48,7 @@ struct dentry* snfs_lookup(
 ) {
   ino_t dirno = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
-  
+
   struct vtfs_inode* vtfsi = vtfs_inode_by_ino(dirno);
   if (vtfsi == NULL) {
     d_add(child_dentry, NULL);
@@ -60,7 +60,7 @@ struct dentry* snfs_lookup(
     return NULL;
   }
   struct vtfs_inode* found = vtfsd->inode;
-  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, found->type, found->no);
+  struct inode* inode = snfs_get_vfs_inode(parent_inode->i_sb, NULL, found->type, found->no);
   atomic_inc(&inode->i_count);
   d_add(child_dentry, inode);
   return NULL;
@@ -93,7 +93,7 @@ static int vtfs_create_dentry(struct inode* parent_inode, struct dentry* child_d
   LOG("Created file with entry %s\n", vtfsentry->name);
   vtfs_add_child(diri, vtfsentry);
   LOG("Added entry %s as child\n", vtfsentry->name);
-  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, ftype, vtfsentry->inode->no);
+  struct inode* inode = snfs_get_vfs_inode(parent_inode->i_sb, NULL, ftype, vtfsentry->inode->no);
   d_instantiate(child_dentry, inode);
   LOG("Added inode to childentry \n");
   return 0;
@@ -249,19 +249,19 @@ int vtfs_fsync(struct file* file, loff_t start, loff_t end, int datasync) {
   return 0;
 }
 
-int vtfs_link(struct dentry* old_dentry, struct inode* parent_dir, struct dentry* new_dentry) {
-  struct vtfs_inode* parenti = vtfs_inode_by_ino(parent_dir->i_ino);
-  if (parenti == NULL) {
-    return -ENODATA;
-  }
-  struct vtfs_inode* oldi = vtfs_inode_by_ino(old_dentry->d_inode->i_ino);
-  if (oldi == NULL) {
-    return -ENODATA;
-  }
+// int vtfs_link(struct dentry* old_dentry, struct inode* parent_dir, struct dentry* new_dentry) {
+//   struct vtfs_inode* parenti = vtfs_inode_by_ino(parent_dir->i_ino);
+//   if (parenti == NULL) {
+//     return -ENODATA;
+//   }
+//   struct vtfs_inode* oldi = vtfs_inode_by_ino(old_dentry->d_inode->i_ino);
+//   if (oldi == NULL) {
+//     return -ENODATA;
+//   }
 
-  vtfs_hard_link(struct vtfs_inode * inode, struct vtfs_dentry * new)
-      vtfs_add_child(diri, vtfsentry);
-  LOG("Added entry %s as child\n", vtfsentry->name);
-  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, ftype, vtfsentry->inode->no);
-  d_instantiate(child_dentry, inode);
-}
+//   vtfs_hard_link(struct vtfs_inode * inode, struct vtfs_dentry * new)
+//       vtfs_add_child(diri, vtfsentry);
+//   LOG("Added entry %s as child\n", vtfsentry->name);
+//   struct inode* inode = snfs_get_vfs_inode(parent_inode->i_sb, NULL, ftype,
+//   vtfsentry->inode->no); d_instantiate(child_dentry, inode);
+// }

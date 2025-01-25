@@ -4,6 +4,7 @@
 #include <linux/dcache.h>
 
 #include "impl.h"
+#include "ops.h"
 #include "util.h"
 
 void snfs_kill_vfs_sb(struct super_block* sb) {

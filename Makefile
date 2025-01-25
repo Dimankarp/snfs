@@ -1,6 +1,5 @@
-obj-m += vtfs.o
-vtfs-objs:= source/vtfs.o source/fs.o source/inode.o source/ops.o source/impl.o
-
+obj-m += snfs.o
+snfs-objs:= source/module.o source/vfs.o source/ops.o source/http.o source/impl.o
 PWD := $(CURDIR) 
 KDIR = /lib/modules/$(shell uname -r)/build
 EXTRA_CFLAGS = -Wall -g

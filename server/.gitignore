@@ -36,5 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 
-### Win Protoc ###
-protoc-*
+### Protoc ###
+protoc*
+server/protoc*
+
+
