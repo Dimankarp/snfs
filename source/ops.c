@@ -32,7 +32,7 @@ const struct inode_operations snfs_inode_ops = {
     .unlink = snfs_unlink,
     .mkdir = snfs_mkdir,
     .rmdir = snfs_rmdir,
-    .link = snfs_link
+   // .link = snfs_link
 };
 
 const struct file_operations snfs_file_ops = {
@@ -99,7 +99,7 @@ static int vtfs_create_dentry(struct inode* parent_inode, struct dentry* child_d
   return 0;
 }
 
-int vtfs_create(
+int snfs_create(
     struct mnt_idmap* map,
     struct inode* parent_inode,
     struct dentry* child_dentry,
@@ -110,14 +110,14 @@ int vtfs_create(
   return vtfs_create_dentry(parent_inode, child_dentry, S_IFREG);
 }
 
-int vtfs_mkdir(
+int snfs_mkdir(
     struct mnt_idmap* map, struct inode* parent_inode, struct dentry* child_dentry, umode_t mode
 ) {
   LOG("[vtfs_mkdir]");
   return vtfs_create_dentry(parent_inode, child_dentry, S_IFDIR);
 }
 
-int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
+int snfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
   const char* name = child_dentry->d_name.name;
   ino_t dirino = parent_inode->i_ino;
   LOG("[vtfs_unlink]");
@@ -135,7 +135,7 @@ int vtfs_unlink(struct inode* parent_inode, struct dentry* child_dentry) {
   return vtfs_remove_file(vtfsd, diri);
 }
 
-int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry) {
+int snfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry) {
   const char* name = child_dentry->d_name.name;
   ino_t dirino = parent_inode->i_ino;
   LOG("[vtfs_rmdir]");
@@ -153,7 +153,7 @@ int vtfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry) {
   return vtfs_remove_dir(vtfsd, diri);
 }
 
-int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
+int snfs_iterate_shared(struct file* filp, struct dir_context* ctx) {
   vtfs_dump();
 
   struct dentry* dentry = filp->f_path.dentry;
@@ -192,7 +192,7 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
   return 0;
 }
 
-ssize_t vtfs_read(struct file* filp, char* buffer, size_t len, loff_t* offset) {
+ssize_t snfs_read(struct file* filp, char* buffer, size_t len, loff_t* offset) {
   ino_t fino = filp->f_inode->i_ino;
   LOG("[vtfs_read]");
   LOG("Searching for inode %lu\n", fino);
@@ -219,7 +219,7 @@ ssize_t vtfs_read(struct file* filp, char* buffer, size_t len, loff_t* offset) {
   return toread;
 }
 
-ssize_t vtfs_write(struct file* filp, const char* buffer, size_t len, loff_t* offset) {
+ssize_t snfs_write(struct file* filp, const char* buffer, size_t len, loff_t* offset) {
   ino_t dirino = filp->f_inode->i_ino;
   LOG("[vtfs_write]");
   LOG("Searching for inode %lu\n", dirino);
@@ -245,7 +245,7 @@ ssize_t vtfs_write(struct file* filp, const char* buffer, size_t len, loff_t* of
   return len;
 }
 
-int vtfs_fsync(struct file* file, loff_t start, loff_t end, int datasync) {
+int snfs_fsync(struct file* file, loff_t start, loff_t end, int datasync) {
   return 0;
 }
 

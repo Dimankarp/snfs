@@ -1,4 +1,4 @@
 #!/bin/bash
-sudo umount /mnt/vt
-sudo rm -rf /mnt/vt
-sudo rmmod vtfs
+sudo umount /mnt/sn
+sudo rm -rf /mnt/sn
+sudo rmmod snfs

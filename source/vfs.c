@@ -3,6 +3,7 @@
 
 #include <linux/dcache.h>
 
+#include "http.h"
 #include "impl.h"
 #include "ops.h"
 #include "util.h"
@@ -16,6 +17,15 @@ int snfs_fill_vfs_sb(struct super_block* sb, void* data, int silent) {
   if (status < 0) {
     return status;
   }
+
+  char* buf = kzalloc(4096, GFP_KERNEL);
+  int st = vtfs_http_call("token", "mount", buf, 4096, 0);
+  int32_t i = *(int32_t*)(buf);
+  for(int i = 0; i < 30; i++){
+    printk("%d ", buf[i]);
+  }
+  LOG("%d, %s, %d", st, buf, i);
+  kfree(buf);
   struct inode* inode = snfs_get_vfs_inode(sb, NULL, S_IFDIR, VTFS_ROOT_NO);
   sb->s_root = d_make_root(inode);
   if (sb->s_root == NULL) {
