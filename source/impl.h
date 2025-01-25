@@ -15,7 +15,7 @@ struct vtfs_inode {
   struct list_head children; /* list of vtfs_dentry */
   char* buf;
   size_t bufsz;
-  spinlock_t lock;
+  struct mutex lock;
 };
 
 struct vtfs_dentry {
@@ -41,4 +41,5 @@ int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from);
 int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from);
 int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz);
 void vtfs_dump(void);
+int vtfs_hard_link(struct vtfs_inode* inode, struct vtfs_dentry* new);
 #endif  // __FSMOD_SOURCE_IMPL_H_s

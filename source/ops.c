@@ -1,26 +1,54 @@
 #include "ops.h"
 
 #include "impl.h"
-#include "inode.h"
 #include "util.h"
+#include "vfs.h"
 
-const struct inode_operations vtfs_inode_ops = {
-    .lookup = vtfs_lookup,
-    .create = vtfs_create,
-    .unlink = vtfs_unlink,
-    .mkdir = vtfs_mkdir,
-    .rmdir = vtfs_rmdir
+struct dentry* snfs_lookup(
+    struct inode* parent_inode, struct dentry* child_dentry, unsigned int flag
+);
+int snfs_iterate_shared(struct file* filp, struct dir_context* ctx);
+int snfs_create(
+    struct mnt_idmap* map,
+    struct inode* parent_inode,
+    struct dentry* child_dentry,
+    umode_t mode,
+    bool b
+);
+int snfs_link(struct dentry* old_dentry, struct inode* parent_dir, struct dentry* new_dentry);
+int snfs_unlink(struct inode* parent_inode, struct dentry* child_dentry);
+int snfs_rmdir(struct inode* parent_inode, struct dentry* child_dentry);
+int snfs_mkdir(
+    struct mnt_idmap* map, struct inode* parent_inode, struct dentry* child_dentry, umode_t mode
+);
+
+ssize_t snfs_read(struct file* filp, char* __user buffer, size_t len, loff_t* offset);
+ssize_t snfs_write(struct file* filp, const char* __user buffer, size_t len, loff_t* offset);
+int snfs_fsync(struct file*, loff_t, loff_t, int);
+
+const struct inode_operations snfs_inode_ops = {
+    .lookup = snfs_lookup,
+    .create = snfs_create,
+    .unlink = snfs_unlink,
+    .mkdir = snfs_mkdir,
+    .rmdir = snfs_rmdir,
+    .link = snfs_link
 };
 
-const struct file_operations vtfs_file_ops = {
-    .iterate_shared = vtfs_iterate, .write = vtfs_write, .read = vtfs_read
+const struct file_operations snfs_file_ops = {
+    .iterate_shared = snfs_iterate_shared,
+    .write = snfs_write,
+    .read = snfs_read,
+    .fsync = snfs_fsync
 };
 
-struct dentry* vtfs_lookup(
+/* Inode ops */
+struct dentry* snfs_lookup(
     struct inode* parent_inode, struct dentry* child_dentry, unsigned int flag
 ) {
   ino_t dirno = parent_inode->i_ino;
   const char* name = child_dentry->d_name.name;
+  
   struct vtfs_inode* vtfsi = vtfs_inode_by_ino(dirno);
   if (vtfsi == NULL) {
     d_add(child_dentry, NULL);
@@ -150,7 +178,7 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
   cur = 2;
   LOG("Emitted node");
   struct vtfs_dentry* vtfsd;
-  spin_lock(&diri->lock);
+  mutex_lock(&diri->lock);
   list_for_each_entry(vtfsd, &diri->children, node) {
     LOG("Cur: %d Pos: %lld", cur, ctx->pos);
     if (cur == ctx->pos) {
@@ -160,11 +188,11 @@ int vtfs_iterate(struct file* filp, struct dir_context* ctx) {
     }
     cur++;
   }
-  spin_unlock(&diri->lock);
+  mutex_unlock(&diri->lock);
   return 0;
 }
 
-ssize_t vtfs_read(struct file* filp, char __user* buffer, size_t len, loff_t* offset) {
+ssize_t vtfs_read(struct file* filp, char* buffer, size_t len, loff_t* offset) {
   ino_t fino = filp->f_inode->i_ino;
   LOG("[vtfs_read]");
   LOG("Searching for inode %lu\n", fino);
@@ -177,25 +205,21 @@ ssize_t vtfs_read(struct file* filp, char __user* buffer, size_t len, loff_t* of
     return -EISDIR;
   }
 
-  spin_lock(&filei->lock);
-  LOG("Contents are %.*s", filei->bufsz, filei->buf);
-  LOG("Read is for len %zu offset %lld\n", len, *offset);
-  if (filei->buf == NULL || *offset >= filei->bufsz) {
-    spin_unlock(&filei->lock);
-    return 0;
+  if (offset == NULL) {
+    return -1;
   }
-
+  mutex_lock(&filei->lock);
   size_t toread = min(filei->bufsz - *offset, len);
-  if (copy_to_user(buffer, filei->buf + *offset, toread)) {
-    spin_unlock(&filei->lock);
+  if (copy_to_user((void __user*)buffer, filei->buf + *offset, toread)) {
+    mutex_unlock(&filei->lock);
     return -EFAULT;
   }
   *offset += toread;
-  spin_unlock(&filei->lock);
+  mutex_unlock(&filei->lock);
   return toread;
 }
 
-ssize_t vtfs_write(struct file* filp, const char __user* buffer, size_t len, loff_t* offset) {
+ssize_t vtfs_write(struct file* filp, const char* buffer, size_t len, loff_t* offset) {
   ino_t dirino = filp->f_inode->i_ino;
   LOG("[vtfs_write]");
   LOG("Searching for inode %lu\n", dirino);
@@ -207,12 +231,37 @@ ssize_t vtfs_write(struct file* filp, const char __user* buffer, size_t len, lof
   if (S_ISDIR(filei->type))
     return -EISDIR;
   LOG("Not dir %lu\n", dirino);
-  spin_lock(&filei->lock);
+  mutex_lock(&filei->lock);
 
   size_t newsz = *offset + len;
   vtfs_set_buf_sz(filei, newsz);
-  copy_from_user(filei->buf + *offset, buffer, len);
-  spin_unlock(&filei->lock);
+  int status = copy_from_user(filei->buf + *offset, buffer, len);
+  LOG("Copied from user offset: %d len %d status %d\n", *offset, len, status);
+  mutex_unlock(&filei->lock);
+  filp->f_inode->i_size = newsz;
+  filp->f_inode->i_blkbits = 8;
+  filp->f_inode->i_blocks = newsz;
   *offset += len;
   return len;
+}
+
+int vtfs_fsync(struct file* file, loff_t start, loff_t end, int datasync) {
+  return 0;
+}
+
+int vtfs_link(struct dentry* old_dentry, struct inode* parent_dir, struct dentry* new_dentry) {
+  struct vtfs_inode* parenti = vtfs_inode_by_ino(parent_dir->i_ino);
+  if (parenti == NULL) {
+    return -ENODATA;
+  }
+  struct vtfs_inode* oldi = vtfs_inode_by_ino(old_dentry->d_inode->i_ino);
+  if (oldi == NULL) {
+    return -ENODATA;
+  }
+
+  vtfs_hard_link(struct vtfs_inode * inode, struct vtfs_dentry * new)
+      vtfs_add_child(diri, vtfsentry);
+  LOG("Added entry %s as child\n", vtfsentry->name);
+  struct inode* inode = vtfs_get_inode(parent_inode->i_sb, NULL, ftype, vtfsentry->inode->no);
+  d_instantiate(child_dentry, inode);
 }
