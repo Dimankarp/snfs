@@ -3,6 +3,7 @@ package snfs.fserver.protocol;
 import lombok.Data;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 @Data
 public class DentryDto implements ByteSerializable {
@@ -11,10 +12,10 @@ public class DentryDto implements ByteSerializable {
     private InodeDto inode;
 
     public void putToBuffer(ByteBuffer buffer) {
-        var len = name.getBytes().length;
-        buffer.put(name.getBytes());
-        if (len < NAME_SZ) {
-            var zeroes = new byte[NAME_SZ - len];
+        var bytes = name.getBytes(StandardCharsets.US_ASCII);
+        buffer.put(bytes);
+        if (bytes.length < NAME_SZ) {
+            var zeroes = new byte[NAME_SZ - bytes.length];
             buffer.put(zeroes);
         }
         inode.putToBuffer(buffer);
