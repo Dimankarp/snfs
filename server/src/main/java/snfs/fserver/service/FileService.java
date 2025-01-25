@@ -1,5 +1,7 @@
 package snfs.fserver.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import snfs.fserver.entity.Dentry;
@@ -16,6 +18,7 @@ import java.util.List;
 public class FileService {
 
 
+    private final Logger logger = LoggerFactory.getLogger(FileService.class);
     private final TokenRepository tokenRepository;
     private final InodeRepository inodeRepository;
     private final DentryRepository dentryRepository;
@@ -108,6 +111,7 @@ public class FileService {
         var file = createFile(name, type);
         dentryRepository.save(file);
         dirNode.getFiles().add(file);
+        logger.debug("Created file with name {}", name);
         return builder.addItem(msgDto(ErrStatus.OK)).addItem(inodeToDto(file.getInode()));
     }
 
@@ -121,6 +125,10 @@ public class FileService {
         var dirNode = dirOpt.get();
         if (dirNode.getType() != InodeType.DIR) {
             return builder.addItem(msgDto(ErrStatus.NOTDIR));
+        }
+
+        for (var entry : dirNode.getFiles()) {
+            logger.debug("Dentry: {} {}", entry.getInode().getNo(), entry.getName());
         }
         return builder.addItem(msgDto(ErrStatus.OK)).addItem(childrenToDto(dirNode.getFiles()));
     }
