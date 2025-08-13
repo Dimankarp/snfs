@@ -4,42 +4,42 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 
-#define VTFS_ROOT_NO 0
-#define VTFS_NAME_SZ 16
+#define SNFS_ROOT_NO 0
+#define SNFS_NAME_SZ 16
 
-struct vtfs_inode {
-  struct list_head node; /* list of vtfs_inode */
+struct snfs_inode {
+  struct list_head node; /* list of snfs_inode */
   _Atomic size_t refs;
   ino_t no;
   int type;
-  struct list_head children; /* list of vtfs_dentry */
+  struct list_head children; /* list of snfs_dentry */
   char* buf;
   size_t bufsz;
   struct mutex lock;
 };
 
-struct vtfs_dentry {
+struct snfs_dentry {
   struct list_head node;
-  char name[VTFS_NAME_SZ];
-  struct vtfs_inode* inode;
+  char name[SNFS_NAME_SZ];
+  struct snfs_inode* inode;
 };
 
-struct vtfs_superblock {
+struct snfs_superblock {
   struct list_head inodes;
   struct list_head dentries;
-  struct vtfs_inode* root;
+  struct snfs_inode* root;
   spinlock_t lock;
   _Atomic ino_t next_ino;
 };
 
-int vtfs_init_sb(void);
-int vtfs_create_file(struct vtfs_dentry* dentry, int type);
-struct vtfs_inode* vtfs_inode_by_ino(ino_t ino);
-struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name);
-void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry);
-int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from);
-int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from);
-int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz);
-void vtfs_dump(void);
-int vtfs_hard_link(struct vtfs_inode* inode, struct vtfs_dentry* new);
+int snfs_init_sb(void);
+int snfs_create_file(struct snfs_dentry* dentry, int type);
+struct snfs_inode* snfs_inode_by_ino(ino_t ino);
+struct snfs_dentry* snfs_find_child(struct snfs_inode* inode, const char* name);
+void snfs_add_child(struct snfs_inode* dir, struct snfs_dentry* entry);
+int snfs_remove_file(struct snfs_dentry* file, struct snfs_inode* from);
+int snfs_remove_dir(struct snfs_dentry* dir, struct snfs_inode* from);
+int snfs_set_buf_sz(struct snfs_inode* file, size_t newsz);
+void snfs_dump(void);
+int snfs_hard_link(struct snfs_inode* inode, struct snfs_dentry* new);
 #endif  // __FSMOD_SOURCE_IMPL_H_s

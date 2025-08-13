@@ -4,21 +4,21 @@
 
 #include "util.h"
 
-static struct vtfs_superblock sb;
+static struct snfs_superblock sb;
 
-int vtfs_init_sb(void) {
-  sb = (struct vtfs_superblock){
+int snfs_init_sb(void) {
+  sb = (struct snfs_superblock){
       .inodes = LIST_HEAD_INIT(sb.inodes),
       .dentries = LIST_HEAD_INIT(sb.dentries),
       .next_ino = 1,
   };
   spin_lock_init(&sb.lock);
-  struct vtfs_inode* inode = kzalloc(sizeof(*inode), GFP_KERNEL);
+  struct snfs_inode* inode = kzalloc(sizeof(*inode), GFP_KERNEL);
   if (inode == NULL) {
     return -ENOMEM;
   }
   inode->refs = 1;
-  inode->no = VTFS_ROOT_NO;
+  inode->no = SNFS_ROOT_NO;
   inode->type = S_IFDIR;
   mutex_init(&inode->lock);
   INIT_LIST_HEAD(&inode->children);
@@ -27,8 +27,8 @@ int vtfs_init_sb(void) {
   return 0;
 }
 
-int vtfs_create_file(struct vtfs_dentry* dentry, int type) {
-  struct vtfs_inode* inode = kzalloc(sizeof(*inode), GFP_KERNEL);
+int snfs_create_file(struct snfs_dentry* dentry, int type) {
+  struct snfs_inode* inode = kzalloc(sizeof(*inode), GFP_KERNEL);
   if (inode == NULL) {
     return -ENOMEM;
   }
@@ -44,7 +44,7 @@ int vtfs_create_file(struct vtfs_dentry* dentry, int type) {
   return 0;
 }
 
-int vtfs_hard_link(struct vtfs_inode* inode, struct vtfs_dentry* new) {
+int snfs_hard_link(struct snfs_inode* inode, struct snfs_dentry* new) {
   if (S_ISDIR(inode->type)) {
     return -EISDIR;
   }
@@ -53,17 +53,17 @@ int vtfs_hard_link(struct vtfs_inode* inode, struct vtfs_dentry* new) {
   return 0;
 }
 
-int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from) {
+int snfs_remove_file(struct snfs_dentry* file, struct snfs_inode* from) {
   if (S_ISDIR(file->inode->type)) {
     return -EISDIR;
   }
-  struct vtfs_inode* vtfsi = file->inode;
-  vtfsi->refs--;
-  if (vtfsi == 0) {
+  struct snfs_inode* snfsi = file->inode;
+  snfsi->refs--;
+  if (snfsi == 0) {
     spin_lock(&sb.lock);
-    list_del(&vtfsi->node);
+    list_del(&snfsi->node);
     spin_unlock(&sb.lock);
-    kfree(vtfsi);
+    kfree(snfsi);
   }
   mutex_lock(&from->lock);
   list_del(&file->node);
@@ -72,24 +72,24 @@ int vtfs_remove_file(struct vtfs_dentry* file, struct vtfs_inode* from) {
   return 0;
 }
 
-int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from) {
+int snfs_remove_dir(struct snfs_dentry* dir, struct snfs_inode* from) {
   if (!S_ISDIR(dir->inode->type)) {
     return -ENOTDIR;
   }
-  struct vtfs_inode* vtfsi = dir->inode;
-  mutex_lock(&vtfsi->lock);
-  if (!list_empty(&vtfsi->children)) {
-    mutex_unlock(&vtfsi->lock);
+  struct snfs_inode* snfsi = dir->inode;
+  mutex_lock(&snfsi->lock);
+  if (!list_empty(&snfsi->children)) {
+    mutex_unlock(&snfsi->lock);
     return -ENOTEMPTY;
   }
-  mutex_unlock(&vtfsi->lock);
+  mutex_unlock(&snfsi->lock);
 
-  vtfsi->refs--;
-  if (vtfsi == 0) {
+  snfsi->refs--;
+  if (snfsi == 0) {
     spin_lock(&sb.lock);
-    list_del(&vtfsi->node);
+    list_del(&snfsi->node);
     spin_unlock(&sb.lock);
-    kfree(vtfsi);
+    kfree(snfsi);
   }
   mutex_lock(&from->lock);
   list_del(&dir->node);
@@ -98,8 +98,8 @@ int vtfs_remove_dir(struct vtfs_dentry* dir, struct vtfs_inode* from) {
   return 0;
 }
 
-struct vtfs_inode* vtfs_inode_by_ino(ino_t ino) {
-  struct vtfs_inode* inode;
+struct snfs_inode* snfs_inode_by_ino(ino_t ino) {
+  struct snfs_inode* inode;
   spin_lock(&sb.lock);
   list_for_each_entry(inode, &sb.inodes, node) {
     if (inode->no == ino) {
@@ -111,8 +111,8 @@ struct vtfs_inode* vtfs_inode_by_ino(ino_t ino) {
   return NULL;
 }
 
-struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name) {
-  struct vtfs_dentry* dentry;
+struct snfs_dentry* snfs_find_child(struct snfs_inode* inode, const char* name) {
+  struct snfs_dentry* dentry;
   mutex_lock(&inode->lock);
   list_for_each_entry(dentry, &inode->children, node) {
     if (strcmp(dentry->name, name) == 0) {
@@ -124,13 +124,13 @@ struct vtfs_dentry* vtfs_find_child(struct vtfs_inode* inode, const char* name) 
   return NULL;
 }
 
-void vtfs_add_child(struct vtfs_inode* dir, struct vtfs_dentry* entry) {
+void snfs_add_child(struct snfs_inode* dir, struct snfs_dentry* entry) {
   mutex_lock(&dir->lock);
   list_add(&entry->node, &dir->children);
   mutex_unlock(&dir->lock);
 }
 
-int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz) {
+int snfs_set_buf_sz(struct snfs_inode* file, size_t newsz) {
   if (S_ISDIR(file->type)) {
     return -EISDIR;
   }
@@ -148,16 +148,16 @@ int vtfs_set_buf_sz(struct vtfs_inode* file, size_t newsz) {
   return 0;
 }
 
-static void vtfs_dump_recursion(struct vtfs_inode* f) {
-  struct vtfs_dentry* dentry;
+static void snfs_dump_recursion(struct snfs_inode* f) {
+  struct snfs_dentry* dentry;
   list_for_each_entry(dentry, &f->children, node) {
     LOG("Inode %d name: %s isdir %d", dentry->inode->no, dentry->name, S_ISDIR(dentry->inode->type)
     );
     if (dentry->inode->type == S_IFDIR)
-      vtfs_dump_recursion(dentry->inode);
+      snfs_dump_recursion(dentry->inode);
   }
 }
 
-void vtfs_dump(void) {
-  vtfs_dump_recursion(sb.root);
+void snfs_dump(void) {
+  snfs_dump_recursion(sb.root);
 }

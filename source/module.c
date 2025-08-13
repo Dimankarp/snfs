@@ -25,7 +25,7 @@ static int __init snfs_init(void) {
 static void __exit snfs_exit(void) {
   unregister_filesystem(&snfs_fs_type);
   LOG("Unregistered fs\n");
-  LOG("VTFS left the kernel\n");
+  LOG("SNFS left the kernel\n");
 }
 
 module_init(snfs_init);

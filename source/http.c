@@ -129,7 +129,7 @@ int64_t parse_http_response(
   return return_value;
 }
 
-int64_t vtfs_http_call(
+int64_t snfs_http_call(
     const char* token,
     const char* method,
     char* response_buffer,

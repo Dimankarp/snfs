@@ -16,3 +16,7 @@ modules.order
 # Clangd
 compile_commands.json
 .cache/
+
+# IDE
+.idea
+.vscode
